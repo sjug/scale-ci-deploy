@@ -152,6 +152,18 @@
 
 - name: OVN block
   block:
+
+  - block:
+     - name: Copy SBDB RBAC rules necessary for auto-deployment
+       copy:
+         src: sbdb-rbac.yaml
+         dest: "{{ ansible_user_dir }}/{{ dynamic_deploy_path }}/sbdb-rbac.yaml"
+       register: copy_sbdb_rbac
+  
+     - name: Create the SBDB RBAC rules
+       command: oc create -f {{ copy_sbdb_rbac.dest }}
+    when: openshift_toggle_ovn_relay|bool
+
   - name: Scale CVO Down for OVNKubernetes image patching
     command: oc scale -n openshift-cluster-version deployment.apps/cluster-version-operator --replicas=0
   
@@ -168,11 +180,8 @@
   - name: Wait for OVNK new master images to roll out
     command: oc rollout status -n {{ ovn_namespace }} ds/ovnkube-master
   
-  - name: OVN SBDB block
+  - name: OVN SBDB verify block
     block:
-    - name: Deploy ovnkube-sbdb-relay
-      script: sbdb-relay.sh deploy
-    
     - name: Wait for OVNK sbdb-relay images to roll out
       command: oc rollout status -n {{ ovn_namespace }} deployment.apps/ovnkube-sbdb-relay
     
