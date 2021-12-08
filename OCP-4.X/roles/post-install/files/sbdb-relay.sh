@@ -76,6 +76,7 @@ elif [[ "$1" == "verify" ]]; then
       fi
     done
     if [[ -z ${ready} ]]; then
+	echo "Restarting verification process"
 	init_verify
     fi
   done

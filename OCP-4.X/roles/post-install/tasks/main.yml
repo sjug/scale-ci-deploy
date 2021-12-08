@@ -184,6 +184,8 @@
     block:
     - name: Wait for OVNK sbdb-relay images to roll out
       command: oc rollout status -n {{ ovn_namespace }} deployment.apps/ovnkube-sbdb-relay
+      delay: 5
+      retries: "{{openshift_post_install_poll_attempts|int}}"
     
     - name: Verify ovnkube-sbdb-relay connectivity
       script: sbdb-relay.sh verify
