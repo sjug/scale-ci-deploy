@@ -54,7 +54,7 @@ elif [[ "$1" == "verify" ]]; then
   while [ "${READY_NODES}" -lt "${NODE_COUNT}" ] ; do
     printf "\nStarting SBDB IP search.\n"
     for POD in "${OVNKUBE_PODS[@]}"; do
-      if ! ${ready[${POD}]}; then
+      if ! ${ready["${POD}"]}; then
 	echo "Checking pod presence"
 	oc get pod ${POD}
         if [ $? -eq 1 ]; then
