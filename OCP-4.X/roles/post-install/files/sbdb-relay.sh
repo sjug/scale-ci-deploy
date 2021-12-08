@@ -6,6 +6,24 @@
 
 OVN_NS=openshift-ovn-kubernetes
 
+init_verify() {
+  SBDB_IPS=($(oc get po -o wide -n ${OVN_NS} | awk '/sbdb-relay/{ print $6 }'))
+  SBDB_IPS_STR="${SBDB_IPS[@]}"
+  OVNKUBE_PODS=($(oc get po -n ${OVN_NS} | awk '/ovnkube-node/{ print $1 }'))
+  NODE_COUNT=${#OVNKUBE_PODS[@]}
+  declare -A ready
+  
+  echo "SBDB relay pod IPs: ${SBDB_IPS_STR}"
+
+  # Populate array tracking node readiness state
+  for PODS in "${OVNKUBE_PODS[@]}"; do
+    ready[${PODS}]=false
+  done
+  
+  # Check SBDB connection of each ovn-controller
+  READY_NODES=0
+}
+
 if [[ "$1" == "deploy" ]]; then
   FOUND=0
 
@@ -31,25 +49,20 @@ if [[ "$1" == "deploy" ]]; then
     fi
   done
 elif [[ "$1" == "verify" ]]; then
-  SBDB_IPS=($(oc get po -o wide -n ${OVN_NS} | awk '/sbdb-relay/{ print $6 }'))
-  SBDB_IPS_STR="${SBDB_IPS[@]}"
-  OVNKUBE_PODS=($(oc get po -n ${OVN_NS} | awk '/ovnkube-node/{ print $1 }'))
-  NODE_COUNT=${#OVNKUBE_PODS[@]}
-  declare -A ready
-  
-  echo "SBDB relay pod IPs: ${SBDB_IPS_STR}"
+  init_verify
 
-  # Populate array tracking node readiness state
-  for PODS in "${OVNKUBE_PODS[@]}"; do
-    ready[${PODS}]=false
-  done
-  
-  # Check SBDB connection of each ovn-controller
-  READY_NODES=0
   while [ "${READY_NODES}" -lt "${NODE_COUNT}" ] ; do
     printf "\nStarting SBDB IP search.\n"
     for POD in "${OVNKUBE_PODS[@]}"; do
       if ! ${ready[${POD}]}; then
+	echo "Checking pod presence"
+	oc get pod ${POD}
+        if [ $? -eq 1 ]; then
+          echo "Guess what, the pod disappeared. Time to explode."
+	  unset ready
+          break
+        fi
+
         echo "Searching pod ${POD} for SBDB IPs."
         oc logs ${POD} -c ovn-controller | grep -E ${SBDB_IPS_STR// /|}
         if [ $? -eq 0 ]; then
@@ -62,6 +75,9 @@ elif [[ "$1" == "verify" ]]; then
         fi
       fi
     done
+    if [[ -z ${ready} ]]; then
+	init_verify
+    fi
   done
 
   echo "All ${READY_NODES} ovnkube-nodes connected to SBDB relays."
