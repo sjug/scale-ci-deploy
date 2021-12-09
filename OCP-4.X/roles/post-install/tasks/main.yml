@@ -172,20 +172,22 @@
   
   - name: Pause the rollout to begin
     pause:
-      seconds: 10
-  
-  - name: Wait for OVNK new node images to roll out
-    command: oc rollout status -n {{ ovn_namespace }} ds/ovnkube-node
+      seconds: 60
   
   - name: Wait for OVNK new master images to roll out
     command: oc rollout status -n {{ ovn_namespace }} ds/ovnkube-master
+  
+  - name: Wait for OVNK new node images to roll out
+    command: oc rollout status -n {{ ovn_namespace }} ds/ovnkube-node
   
   - name: OVN SBDB verify block
     block:
     - name: Wait for OVNK sbdb-relay images to roll out
       command: oc rollout status -n {{ ovn_namespace }} deployment.apps/ovnkube-sbdb-relay
+      retries: 5
       delay: 5
-      retries: "{{openshift_post_install_poll_attempts|int}}"
+      register: wait
+      until: wait.rc == 0
     
     - name: Verify ovnkube-sbdb-relay connectivity
       script: sbdb-relay.sh verify
